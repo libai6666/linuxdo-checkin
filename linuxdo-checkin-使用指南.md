@@ -61,6 +61,7 @@ LinuxDo 论坛的信任等级（Trust Level）与"访问天数"等活跃指标�
 | `GOTIFY_URL` + `GOTIFY_TOKEN` | Gotify 通知 |
 | `SC3_PUSH_KEY` | Server酱³ 通知 |
 | `WXPUSH_URL` + `WXPUSH_TOKEN` | wxpush 通知 |
+| `WECOM_WEBHOOK_URL` | 企业微信群机器人通知（需改造版代码） |
 
 > 以上全部**可选**，不配置不影响签到，只是收不到推送通知。添加方式与前面相同：仓库 `Settings` → `Secrets and variables` → `Actions` → `New repository secret`。
 
@@ -84,7 +85,26 @@ LinuxDo 论坛的信任等级（Trust Level）与"访问天数"等活跃指标�
 - **wxpush 通知**（需要你有自建的 wxpush 服务）：
   添加两个 Secret：`WXPUSH_URL` 填服务地址，`WXPUSH_TOKEN` 填对应 token（脚本会以 POST 方式请求 `{WXPUSH_URL}/wxsend`）。
 
+- **企业微信群机器人通知**（需使用改造版代码，原版不支持）：
+  1. 在企微群聊中：群设置 → 群机器人 → 添加机器人，复制 Webhook 地址（形如 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx`）；
+  2. 添加 Secret：Name 填 `WECOM_WEBHOOK_URL`，Value 填完整 Webhook 地址。
+
 > 通知渠道可以同时配置多个，配了哪个就推哪个；一个都不配则自动跳过通知环节。
+
+#### 2.5 多账号保活（需使用改造版代码）
+
+原版只支持单账号；改造版（见 d:\CursorWork\linuxdo-checkin\ 目录下的 main.py / notify.py / README.md / .github/workflows/daily-check-in.yml）支持多账号：
+
+- `LINUXDO_COOKIES`：**每行一个账号**的 Cookie 字符串（Cookie 内部含分号，只能按行分隔）：
+  ```
+  _t=账号1的cookie; _forum_session=xxx
+  _t=账号2的cookie; _forum_session=yyy
+  ```
+- `LINUXDO_USERNAME` / `LINUXDO_PASSWORD`：多账号按行或 `&` 分隔，顺序一一对应：`user1&user2` / `pass1&pass2`；
+- 第 i 个账号优先用第 i 行 Cookie，失效时自动回退到第 i 组账号密码；单账号用法不变；
+- 所有账号处理完会合并发一条通知，包含每个账号的结果。
+
+应用方法：把改造版的 4 个文件覆盖到你 fork 的仓库（GitHub 网页版逐个文件点 Edit 粘贴保存，或本地 git push）。注意：覆盖后建议关闭/删除 `sync.yml` 自动同步上游的 workflow，否则每天同步上游会把改动冲掉。
 
 #### 3. 启用并手动触发一次工作流
 
