@@ -37,6 +37,7 @@ jobs:
           SC3_PUSH_KEY: ${{ secrets.SC3_PUSH_KEY }}
           WXPUSH_URL: ${{ secrets.WXPUSH_URL }}
           WXPUSH_TOKEN: ${{ secrets.WXPUSH_TOKEN }}
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LINUXDO_COOKIES: ${{ secrets.LINUXDO_COOKIES }}

@@ -57,6 +57,30 @@ if not USERNAME:
 if not PASSWORD:
     PASSWORD = os.environ.get("PASSWORD")
 
+
+def parse_accounts():
+    """
+    解析多账号配置：
+    - LINUXDO_COOKIES：每行一个账号的 Cookie 字符串（Cookie 内部含分号，只能按行分隔）
+    - LINUXDO_USERNAME / LINUXDO_PASSWORD：按行或 & 分隔，两者顺序一一对应
+    第 i 个账号优先用第 i 行 Cookie，失效时回退到第 i 组账号密码
+    """
+    cookie_list = [c.strip() for c in COOKIES.splitlines() if c.strip()]
+    usernames = [u.strip() for u in (USERNAME or "").replace("&", "\n").splitlines() if u.strip()]
+    passwords = [p.strip() for p in (PASSWORD or "").replace("&", "\n").splitlines() if p.strip()]
+    count = max(len(cookie_list), len(usernames))
+    accounts = []
+    for i in range(count):
+        accounts.append(
+            {
+                "cookies": cookie_list[i] if i < len(cookie_list) else "",
+                "username": usernames[i] if i < len(usernames) else "",
+                "password": passwords[i] if i < len(passwords) else "",
+            }
+        )
+    return accounts
+
+
 HOME_URL = "https://linux.do/"
 LOGIN_URL = "https://linux.do/login"
 SESSION_URL = "https://linux.do/session"
@@ -64,8 +88,12 @@ CSRF_URL = "https://linux.do/session/csrf"
 
 
 class LinuxDoBrowser:
-    def __init__(self) -> None:
+    def __init__(self, username="", password="", cookies="") -> None:
         from sys import platform
+
+        self.username = username
+        self.password = password
+        self.cookies = cookies
 
         if platform == "linux" or platform == "linux2":
             platformIdentifier = "X11; Linux x86_64"
@@ -95,8 +123,6 @@ class LinuxDoBrowser:
                 "Accept-Language": "zh-CN,zh;q=0.9",
             }
         )
-        # 初始化通知管理器
-        self.notifier = NotificationManager()
 
     @staticmethod
     def parse_cookie_string(cookie_str: str) -> list[dict]:
@@ -185,8 +211,8 @@ class LinuxDoBrowser:
         )
 
         data = {
-            "login": USERNAME,
-            "password": PASSWORD,
+            "login": self.username,
+            "password": self.password,
             "second_factor_method": "1",
             "timezone": "Asia/Shanghai",
         }
@@ -305,24 +331,25 @@ class LinuxDoBrowser:
     def run(self):
         try:
             # 优先使用手动 Cookie 登录，没有再使用账号密码
-            if COOKIES:
-                login_res = self.login_with_cookies(COOKIES)
-                if not login_res:
+            if self.cookies:
+                login_res = self.login_with_cookies(self.cookies)
+                if not login_res and self.username and self.password:
                     logger.warning("Cookie 登录失败，尝试账号密码登录...")
                     login_res = self.login()
             else:
                 login_res = self.login()
             if not login_res:  # 登录
                 logger.warning("登录验证失败")
+                return False
 
             if BROWSE_ENABLED:
                 click_topic_res = self.click_topic()  # 点击主题
                 if not click_topic_res:
                     logger.error("点击主题失败，程序终止")
-                    return
+                    return False
                 logger.info("完成浏览任务")
             self.print_connect_info()  # 打印连接信息
-            self.send_notifications(BROWSE_ENABLED)  # 发送通知
+            return True
         finally:
             try:
                 self.page.close()
@@ -370,19 +397,38 @@ class LinuxDoBrowser:
         logger.info("--------------Connect Info-----------------")
         logger.info("\n" + tabulate(info, headers=["项目", "当前", "要求"], tablefmt="pretty"))
 
-    def send_notifications(self, browse_enabled):
-        """发送签到通知"""
-        status_msg = f"✅每日登录成功: {USERNAME}"
-        if browse_enabled:
-            status_msg += " + 浏览任务完成"
-        
-        # 使用通知管理器发送所有通知
-        self.notifier.send_all("LINUX DO", status_msg)
-
 
 if __name__ == "__main__":
-    if not COOKIES and (not USERNAME or not PASSWORD):
+    accounts = parse_accounts()
+    if not accounts:
         print("请设置 LINUXDO_COOKIES（Cookie 登录），或同时设置 USERNAME 和 PASSWORD（账号密码登录）")
         exit(1)
-    browser = LinuxDoBrowser()
-    browser.run()
+
+    results = []
+    for idx, account in enumerate(accounts, 1):
+        logger.info(f"===== 开始处理第 {idx}/{len(accounts)} 个账号 =====")
+        if not account["cookies"] and (not account["username"] or not account["password"]):
+            logger.error(f"第 {idx} 个账号既没有 Cookie 也没有完整的账号密码，跳过")
+            results.append((f"账号{idx}", False))
+            continue
+        name = account["username"] or f"账号{idx}"
+        try:
+            success = LinuxDoBrowser(**account).run()
+        except Exception as e:
+            logger.error(f"账号 {name} 执行异常: {str(e)}")
+            success = False
+        results.append((name, bool(success)))
+
+    lines = []
+    for name, success in results:
+        if success:
+            line = f"✅每日登录成功: {name}"
+            if BROWSE_ENABLED:
+                line += " + 浏览任务完成"
+        else:
+            line = f"❌签到失败: {name}"
+        lines.append(line)
+    NotificationManager().send_all("LINUX DO", "\n".join(lines))
+
+    if not any(success for _, success in results):
+        exit(1)

@@ -21,6 +21,8 @@
 - (可选)`Gotify`通知功能，推送获取签到结果。
 - (可选)`Server酱³`通知功能，推送获取签到结果。
 - (可选)`wxpush`通知功能，推送获取签到结果。
+- (可选)`企业微信群机器人`通知功能，推送获取签到结果。
+- 支持多账号签到。
 ## 环境变量配置
 
 ### 登录方式（二选一）
@@ -55,7 +57,26 @@
 | `SC3_PUSH_KEY`       | Server酱³ SendKey     | `sctpxxxxt`                            |
 | `WXPUSH_URL`         | wxpush 服务器地址         | `https://your.wxpush.server`           |
 | `WXPUSH_TOKEN`       | wxpush 的 token       | `your_wxpush_token`                    |
+| `WECOM_WEBHOOK_URL`  | 企业微信群机器人 Webhook 地址 | `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx` |
 | `BROWSE_ENABLED`     | 是否启用浏览帖子功能           | `true` 或 `false`，默认为 `true`           |
+
+### 多账号配置
+
+支持在同一个环境变量里配置多个账号，脚本会依次为每个账号签到：
+
+- `LINUXDO_COOKIES`：**每行一个账号**的 Cookie 字符串（Cookie 内部含分号，只能按行分隔）：
+  ```
+  _t=账号1的cookie; _forum_session=xxx
+  _t=账号2的cookie; _forum_session=yyy
+  ```
+- `LINUXDO_USERNAME` / `LINUXDO_PASSWORD`：多个账号按行或 `&` 分隔，两者顺序一一对应：
+  ```
+  LINUXDO_USERNAME: user1&user2
+  LINUXDO_PASSWORD: pass1&pass2
+  ```
+- 第 i 个账号优先使用第 i 行 Cookie，Cookie 失效时自动回退到第 i 组账号密码。
+- 单账号用法不变，无需任何调整。
+- 所有账号处理完成后会合并发送一条通知，包含每个账号的签到结果。
 
 ---
 
@@ -166,6 +187,11 @@
 
 当配置了 `WXPUSH_URL` 和 `WXPUSH_TOKEN` 时，签到结果会通过 wxpush 推送通知。
 使用 POST 方式推送，请求地址为 `{WXPUSH_URL}/wxsend`。
+
+### 企业微信群机器人通知
+
+当配置了 `WECOM_WEBHOOK_URL` 时，签到结果会通过企业微信群机器人推送到群聊。
+获取方法：在企业微信群聊中 右键/群设置 → 群机器人 → 添加机器人，复制 Webhook 地址（形如 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx`）填入即可。
 
 ### Telegram 通知
 

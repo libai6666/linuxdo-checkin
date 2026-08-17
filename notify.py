@@ -22,6 +22,7 @@ class NotificationManager:
         self.wxpush_token = os.environ.get("WXPUSH_TOKEN")
         self.telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
         self.telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+        self.wecom_webhook_url = os.environ.get("WECOM_WEBHOOK_URL")
     
     def send_all(self, title: str, message: str):
         """发送所有配置的通知"""
@@ -29,6 +30,7 @@ class NotificationManager:
         self.send_server_chan(title, message)
         self.send_wxpush(title, message)
         self.send_telegram(title, message)
+        self.send_wecom(title, message)
     
     def send_gotify(self, title: str, message: str):
         """发送 Gotify 通知"""
@@ -103,6 +105,32 @@ class NotificationManager:
             logger.error(f"wxpush 推送失败: {str(e)}")
             return False
     
+    def send_wecom(self, title: str, message: str):
+        """发送企业微信群机器人通知"""
+        if not self.wecom_webhook_url:
+            logger.info("未配置 WECOM_WEBHOOK_URL，跳过企微群机器人通知")
+            return False
+
+        try:
+            response = requests.post(
+                self.wecom_webhook_url,
+                json={
+                    "msgtype": "text",
+                    "text": {"content": f"{title}\n{message}"},
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            result = response.json()
+            if result.get("errcode") != 0:
+                logger.error(f"企微群机器人推送失败: {result}")
+                return False
+            logger.success("企微群机器人推送成功")
+            return True
+        except Exception as e:
+            logger.error(f"企微群机器人推送失败: {str(e)}")
+            return False
+
     def send_telegram(self, title: str, message: str):
         """发送 Telegram 通知"""
         if not self.telegram_bot_token or not self.telegram_chat_id:
