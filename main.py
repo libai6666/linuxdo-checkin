@@ -166,6 +166,11 @@ class LinuxDoBrowser:
         time.sleep(5)
 
         # 验证登录状态
+        page_title = self.page.title or ""
+        logger.info(f"当前页面标题: {page_title} | URL: {self.page.url}")
+        if any(kw in page_title for kw in ("Just a moment", "请稍候", "Attention Required")):
+            logger.error("被 Cloudflare 人机验证拦截（运行环境 IP 被拦截，与 Cookie 是否正确无关）")
+            return False
         try:
             user_ele = self.page.ele("@id=current-user")
         except Exception as e:
